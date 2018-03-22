@@ -15,10 +15,12 @@ import org.apache.commons.cli.ParseException;
 import com.codahale.metrics.Timer;
 import com.datastax.driver.core.ColumnMetadata;
 import com.datastax.driver.core.ConsistencyLevel;
+import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.Metrics;
 import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.TableMetadata;
+import com.datastax.driver.core.TableOptionsMetadata;
 import com.datastax.driver.dse.DseCluster;
 import com.datastax.driver.dse.DseCluster.Builder;
 import com.datastax.driver.dse.DseSession;
@@ -61,7 +63,9 @@ public class Main {
 			if (cmd.hasOption("v")) {
 				System.out.println("Version " + version);
 			} else if (cmd.hasOption("audit")) {
-				if (file == null) {
+				if (keyspace == null) {
+					main.listKeyspaces(ip, port, login, mdp);
+				} else if (file == null) {
 				main.audit(ip, port, login, mdp, keyspace);
 				} else {
 					main.auditHtml(ip, port, login, mdp, keyspace, file);
@@ -80,6 +84,29 @@ public class Main {
 		}
 	}
 
+	private void listKeyspaces(String ip, String port, String login, String mdp) {
+		DseCluster dseCluster = null;
+		DseSession dseSession;
+		System.out.println("Audit d'une base de données cassandra ");
+		System.out.println("Adresse ip:" + ip);
+		System.out.println("Port:" + ip);
+		System.out.println("Login:" + login);
+		//System.out.println("Mdp:" + mdp);
+		
+		Builder builder = DseCluster.builder();
+		builder = builder.addContactPoint(ip).withCredentials(login, mdp);
+		dseCluster = builder.withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_ONE))
+				.build();
+		dseSession = dseCluster.connect();
+		Metadata meta = dseCluster.getMetadata();
+		System.out.println("Cluster name: " + meta.getClusterName());
+		System.out.println("=======================================");
+		for (KeyspaceMetadata keyspace : meta.getKeyspaces()) {
+			System.out.println(keyspace.getName());
+		}
+		dseSession.close();
+		dseCluster.close();
+	}
 	private void audit(String ip, String port, String login, String mdp, String keyspace) {
 		DseCluster dseCluster = null;
 		DseSession dseSession;
@@ -117,7 +144,18 @@ public class Main {
 		stb.append(".db-table {min-width: 150px; border: 1px solid; float: left; margin: 10px; padding: 0px;} \n");
 		stb.append(".cadre {border-bottom: 1px solid;    margin: 0px;  padding: 5px;} \n");
 		stb.append(".bottom-line {border-bottom: 1px solid;} \n");
+		stb.append(".hide {display: none;} \n");
 		stb.append("</style>\n");
+		stb.append("<script type=\"text/javascript\">\n");
+		stb.append("function myFunction(myDiv) {\n");
+		stb.append("var x = document.getElementById(myDiv);\n");
+		 stb.append("if (x.style.display === \"none\") {\n");
+		 stb.append("x.style.display = \"block\";\n");
+		 stb.append(" } else {\n");
+		 stb.append("x.style.display = \"none\";\n");
+		 stb.append("}\n");
+		 stb.append("}\n");
+		stb.append("</script>\n");
 		stb.append("</head>\n");
 		stb.append("<body>\n");
 		Builder builder = DseCluster.builder();
@@ -137,9 +175,34 @@ public class Main {
 			}
 			stb.append("</div>\n");
 			stb.append("<div class=\"cadre bottom-line\">\n");
-			for (ColumnMetadata column : table.getClusteringColumns()) {
+			for (ColumnMetadata column : table.getPrimaryKey()) {
 				stb.append("- " + column.getName() + " : " + column.getType() + "<br />\n");
 			}
+			stb.append("</div>\n");
+			stb.append("<div style=\"cursor: pointer;\" onclick=\"myFunction('myDIV"+table.getName()+"')\">\n");
+			stb.append(" More (+)\n");
+			stb.append("<div id=\"myDIV"+table.getName()+"\" class=\"cadre bottom-line\" style=\"display: none;\">\n");
+			
+				stb.append("- BloomFilterFalsePositiveChance: " + table.getOptions().getBloomFilterFalsePositiveChance() + "<br />\n");
+				stb.append("- DefaultTimeToLive: " + table.getOptions().getDefaultTimeToLive() + "<br />\n");
+				stb.append("- Comment: " + table.getOptions().getComment() + "<br />\n");
+				stb.append("- GcGraceInSeconds: " + table.getOptions().getGcGraceInSeconds() + "<br />\n");
+				stb.append("- LocalReadRepairChance: " + table.getOptions().getLocalReadRepairChance() + "<br />\n");
+				stb.append("- MemtableFlushPeriodInMs: " + table.getOptions().getMemtableFlushPeriodInMs() + "<br />\n");
+				stb.append("- ReadRepairChance: " + table.getOptions().getReadRepairChance() + "<br />\n");
+				stb.append("- SpeculativeRetry: " + table.getOptions().getSpeculativeRetry() + "<br />\n");
+				stb.append("- CrcCheckChance: " + table.getOptions().getCrcCheckChance() + "<br />\n");
+				stb.append("- IndexInterval: " + table.getOptions().getIndexInterval() + "<br />\n");
+				stb.append("- MaxIndexInterval: " + table.getOptions().getMaxIndexInterval() + "<br />\n");
+				stb.append("- MinIndexInterval: " + table.getOptions().getMinIndexInterval() + "<br />\n");
+				stb.append("- Caching: " + table.getOptions().getCaching() + "<br />\n");
+				stb.append("- Compaction: " + table.getOptions().getCompaction() + "<br />\n");
+				stb.append("- Compression: " + table.getOptions().getCompression() + "<br />\n");
+				stb.append("- Extensions: " + table.getOptions().getExtensions() + "<br />\n");
+				stb.append("- PopulateIOCacheOnFlush: " + table.getOptions().getPopulateIOCacheOnFlush() + "<br />\n");
+				stb.append("- ReplicateOnWrite: " + table.getOptions().getReplicateOnWrite() + "<br />\n");
+				
+				stb.append("</div>\n");
 			stb.append("</div>\n");
 			stb.append("</div>\n");
 		}
