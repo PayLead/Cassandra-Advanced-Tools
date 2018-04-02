@@ -20,7 +20,6 @@ import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.Metrics;
 import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.TableMetadata;
-import com.datastax.driver.core.TableOptionsMetadata;
 import com.datastax.driver.dse.DseCluster;
 import com.datastax.driver.dse.DseCluster.Builder;
 import com.datastax.driver.dse.DseSession;
@@ -44,6 +43,7 @@ public class Main {
 		options.addOption(Option.builder("p").argName("portNumber").longOpt("port").desc("Port number to connect").hasArg(true).build());
 		options.addOption(Option.builder("u").argName("user").longOpt("user").desc("Cassandra connect user").hasArg(true).build());
 		options.addOption(Option.builder("P").argName("password").longOpt("pass").desc("Cassandra connect password").hasArg(true).build());
+		options.addOption(Option.builder("t").longOpt("tex").desc("Export in latex mode").hasArg(false).build());
 		
 		
 
@@ -68,7 +68,11 @@ public class Main {
 				} else if (file == null) {
 				main.audit(ip, port, login, mdp, keyspace);
 				} else {
+					if (cmd.hasOption("t")) {
+						main.auditLatex(ip, port, login, mdp, keyspace, file);
+					} else {
 					main.auditHtml(ip, port, login, mdp, keyspace, file);
+					}
 				}
 			} else if (cmd.hasOption("stats")) {
 				main.stat(ip, port, login, mdp, keyspace);
@@ -221,6 +225,103 @@ public class Main {
 			e.printStackTrace();
 		}
 	}
+	
+	private void auditLatex(String ip, String port, String login, String mdp, String keyspace, String file) {
+		DseCluster dseCluster = null;
+		DseSession dseSession;
+		System.out.println("Audit d'une base de données cassandra ");
+		System.out.println("Adresse ip:" + ip);
+		System.out.println("Port:" + ip);
+		System.out.println("Login:" + login);
+		//System.out.println("Mdp:" + mdp);
+		System.out.println("Keyspace:" + keyspace);
+		StringBuffer stb = new StringBuffer();
+		stb.append("\\documentclass[a3paper, 11pt]{article}\n");
+		stb.append("\\usepackage[applemac]{inputenc}\n");
+		stb.append("\\usepackage[a3paper]{geometry}\n");
+		stb.append("\\usepackage[T1]{fontenc}\n");
+		stb.append("\\usepackage{lmodern}\n");
+		stb.append("\\usepackage{graphicx}\n");
+		stb.append("\\usepackage[french]{babel}\n");
+		stb.append("\\usepackage{pdflscape}\n");
+		stb.append("\\usepackage{multicol}\n");
+		stb.append("\\begin{document}\n");
+		stb.append("\\begin{landscape}\n");
+		stb.append("\\begin{multicols}{2}\n");
+		Builder builder = DseCluster.builder();
+		builder = builder.addContactPoint(ip).withCredentials(login, mdp);
+		dseCluster = builder.withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_ONE))
+				.build();
+		dseSession = dseCluster.connect(keyspace);
+		Metadata meta = dseCluster.getMetadata();
+		int i = 0;
+		for (TableMetadata table : meta.getKeyspace(keyspace).getTables()) {
+			i++;
+			stb.append("\\begin{table}[ht]\n");
+			stb.append("\\begin{tabular}{|c|}\n");
+			stb.append("\\hline\n");
+			stb.append(table.getName().replace("_", "\\_") + " \\\\\n");
+			stb.append("\\hline\n");
+			for (ColumnMetadata column : table.getColumns()) {
+				stb.append("- " + column.getName().replace("_", "\\_") + " : " + column.getType() + " \\\\\n");
+			}
+			/*stb.append("</div>\n");
+			stb.append("<div class=\"cadre bottom-line\">\n");
+			for (ColumnMetadata column : table.getPrimaryKey()) {
+				stb.append("- " + column.getName() + " : " + column.getType() + "<br />\n");
+			}
+			stb.append("</div>\n");
+			stb.append("<div style=\"cursor: pointer;\" onclick=\"myFunction('myDIV"+table.getName()+"')\">\n");
+			stb.append(" More (+)\n");
+			stb.append("<div id=\"myDIV"+table.getName()+"\" class=\"cadre bottom-line\" style=\"display: none;\">\n");
+			
+				stb.append("- BloomFilterFalsePositiveChance: " + table.getOptions().getBloomFilterFalsePositiveChance() + "<br />\n");
+				stb.append("- DefaultTimeToLive: " + table.getOptions().getDefaultTimeToLive() + "<br />\n");
+				stb.append("- Comment: " + table.getOptions().getComment() + "<br />\n");
+				stb.append("- GcGraceInSeconds: " + table.getOptions().getGcGraceInSeconds() + "<br />\n");
+				stb.append("- LocalReadRepairChance: " + table.getOptions().getLocalReadRepairChance() + "<br />\n");
+				stb.append("- MemtableFlushPeriodInMs: " + table.getOptions().getMemtableFlushPeriodInMs() + "<br />\n");
+				stb.append("- ReadRepairChance: " + table.getOptions().getReadRepairChance() + "<br />\n");
+				stb.append("- SpeculativeRetry: " + table.getOptions().getSpeculativeRetry() + "<br />\n");
+				stb.append("- CrcCheckChance: " + table.getOptions().getCrcCheckChance() + "<br />\n");
+				stb.append("- IndexInterval: " + table.getOptions().getIndexInterval() + "<br />\n");
+				stb.append("- MaxIndexInterval: " + table.getOptions().getMaxIndexInterval() + "<br />\n");
+				stb.append("- MinIndexInterval: " + table.getOptions().getMinIndexInterval() + "<br />\n");
+				stb.append("- Caching: " + table.getOptions().getCaching() + "<br />\n");
+				stb.append("- Compaction: " + table.getOptions().getCompaction() + "<br />\n");
+				stb.append("- Compression: " + table.getOptions().getCompression() + "<br />\n");
+				stb.append("- Extensions: " + table.getOptions().getExtensions() + "<br />\n");
+				stb.append("- PopulateIOCacheOnFlush: " + table.getOptions().getPopulateIOCacheOnFlush() + "<br />\n");
+				stb.append("- ReplicateOnWrite: " + table.getOptions().getReplicateOnWrite() + "<br />\n");
+				
+				stb.append("</div>\n");
+			stb.append("</div>\n");
+			stb.append("</div>\n");*/
+			stb.append("\\hline\n");
+			stb.append("\\end{tabular}\n");
+			stb.append("\\end{table}\n");
+			if (i == 15) {
+				i = 0;
+			stb.append("\\clearpage\n");
+			}
+		}
+		stb.append("\\end{multicols}\n");
+		stb.append("\\end{landscape}\n");
+		stb.append("\\end{document}\n");
+		dseSession.close();
+		dseCluster.close();
+		System.out.println(stb.toString());
+		BufferedWriter writer;
+		try {
+			writer = new BufferedWriter(new FileWriter(file));
+			 writer.write(stb.toString());		     
+			 writer.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
 	private void stat(String ip, String port, String login, String mdp, String keyspace) {
 		DseCluster dseCluster = null;
 		DseSession dseSession;
