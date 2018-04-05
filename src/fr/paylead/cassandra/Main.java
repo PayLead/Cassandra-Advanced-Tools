@@ -3,6 +3,12 @@ package fr.paylead.cassandra;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -236,18 +242,19 @@ public class Main {
 		//System.out.println("Mdp:" + mdp);
 		System.out.println("Keyspace:" + keyspace);
 		StringBuffer stb = new StringBuffer();
-		stb.append("\\documentclass[a3paper, 11pt]{article}\n");
+		stb.append("\\documentclass[a4paper, 11pt]{article}\n");
 		stb.append("\\usepackage[applemac]{inputenc}\n");
-		stb.append("\\usepackage[a3paper]{geometry}\n");
+		stb.append("\\usepackage[a4paper]{geometry}\n");
 		stb.append("\\usepackage[T1]{fontenc}\n");
 		stb.append("\\usepackage{lmodern}\n");
 		stb.append("\\usepackage{graphicx}\n");
 		stb.append("\\usepackage[french]{babel}\n");
 		stb.append("\\usepackage{pdflscape}\n");
-		stb.append("\\usepackage{multicol}\n");
+		
+		stb.append("\\usepackage[inner=0.5in, margin=0in,bottom=0.25in, top=0.25in, outer=3in]{geometry}\n");
 		stb.append("\\begin{document}\n");
-		stb.append("\\begin{landscape}\n");
-		stb.append("\\begin{multicols}{2}\n");
+		//stb.append("\\begin{landscape}\n");
+		stb.append("\\setlength{\\fboxrule}{0pt}\n");
 		Builder builder = DseCluster.builder();
 		builder = builder.addContactPoint(ip).withCredentials(login, mdp);
 		dseCluster = builder.withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_ONE))
@@ -255,9 +262,11 @@ public class Main {
 		dseSession = dseCluster.connect(keyspace);
 		Metadata meta = dseCluster.getMetadata();
 		int i = 0;
-		for (TableMetadata table : meta.getKeyspace(keyspace).getTables()) {
+		ArrayList<TableMetadata> list = new ArrayList<TableMetadata>(meta.getKeyspace(keyspace).getTables());
+		list.sort((left,right) -> left.getColumns().size() - right.getColumns().size());
+		for (TableMetadata table : list) {
 			i++;
-			stb.append("\\begin{table}[ht]\n");
+			stb.append("\\framebox{\n");
 			stb.append("\\begin{tabular}{|c|}\n");
 			stb.append("\\hline\n");
 			stb.append(table.getName().replace("_", "\\_") + " \\\\\n");
@@ -299,14 +308,11 @@ public class Main {
 			stb.append("</div>\n");*/
 			stb.append("\\hline\n");
 			stb.append("\\end{tabular}\n");
-			stb.append("\\end{table}\n");
-			if (i == 15) {
-				i = 0;
-			stb.append("\\clearpage\n");
-			}
+			stb.append("}\n");
+			
 		}
-		stb.append("\\end{multicols}\n");
-		stb.append("\\end{landscape}\n");
+		
+		//stb.append("\\end{landscape}\n");
 		stb.append("\\end{document}\n");
 		dseSession.close();
 		dseCluster.close();
@@ -320,6 +326,18 @@ public class Main {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		try {
+			System.out.println("latexmk -pdf  -synctex=1 " + file);
+			Process p = Runtime.getRuntime().exec("latexmk -pdf -synctex=1 " + file);
+			OutputStream out = p.getOutputStream();
+			PrintStream prt = new PrintStream(out);
+			prt.println();
+			
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		System.out.println("Done");
 	}
 	
 	private void stat(String ip, String port, String login, String mdp, String keyspace) {
@@ -373,5 +391,16 @@ public class Main {
 		System.out.println(metrics.getBlockingExecutorQueueDepth().getValue() + "\t The number of queued up tasks in the blocking executor (Cassandra Java Driver blocking tasks worker).");
 		dseSession.close();
 		dseCluster.close();
+	}
+	
+	 
+	class Sortbyroll implements Comparator<TableMetadata>
+	{
+	    // Used for sorting in ascending order of
+	    // roll number
+	    public int compare(TableMetadata a, TableMetadata b)
+	    {
+	        return a.getColumns().size() - b.getColumns().size();
+	    }
 	}
 }
