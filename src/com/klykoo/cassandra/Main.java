@@ -1,4 +1,4 @@
-package fr.paylead.cassandra;
+package com.klykoo.cassandra;
 
 import java.io.BufferedWriter;
 import java.io.File;
